@@ -1,5 +1,5 @@
 const { ChannelType, GuildSystemChannelFlags, PermissionFlagsBits: P } = require('discord.js');
-const { env, ROLES, CATEGORIES, READ_ONLY_DENY, STAFF_ROLES } = require('./config');
+const { env, ROLES, CATEGORIES, READ_ONLY_DENY, EVERYONE_PERMS, STAFF_ROLES } = require('./config');
 
 // "💫 • Bienvenue •" -> "bienvenue" : permet de retrouver un salon même si
 // Discord a modifié les espaces/emojis, pour ne jamais créer de doublon.
@@ -55,6 +55,7 @@ async function setupRoles(guild, log) {
 async function setupChannels(guild, roles, log) {
   const everyone = guild.roles.everyone.id;
   const readOnly = [{ id: everyone, deny: READ_ONLY_DENY }];
+  const publicReadOnly = [{ id: everyone, allow: [P.ViewChannel], deny: READ_ONLY_DENY }];
   const staffOnly = [
     { id: everyone, deny: [P.ViewChannel] },
     ...STAFF_ROLES.map((key) => ({
@@ -67,7 +68,13 @@ async function setupChannels(guild, roles, log) {
 
   for (const [catIndex, cat] of CATEGORIES.entries()) {
     let category = findChannel(guild, [ChannelType.GuildCategory], cat.name);
-    const overwrites = cat.staffOnly ? staffOnly : cat.readOnly ? readOnly : [];
+    const overwrites = cat.staffOnly
+      ? staffOnly
+      : cat.public
+        ? publicReadOnly
+        : cat.readOnly
+          ? readOnly
+          : [];
     if (category) {
       await category.permissionOverwrites.set(overwrites);
       log(`Catégorie mise à jour : ${cat.name}`);
@@ -140,22 +147,7 @@ async function assignRoles(guild, roles, log) {
   for (const id of env.fondateurIds) await give(id, roles.fondateur);
   for (const id of env.creatriceIds) await give(id, roles.creatrice);
   for (const id of env.managerIds) await give(id, roles.manager);
-
-  // Tous les humains qui n'ont encore aucun rôle du serveur reçoivent "Membre".
-  let members;
-  try {
-    members = await guild.members.fetch();
-  } catch (err) {
-    return log(`⚠️ Impossible de lister les membres (active "Server Members Intent") : ${err.message}`);
-  }
-  const ourRoleIds = Object.values(roles).map((r) => r.id);
-  let count = 0;
-  for (const member of members.values()) {
-    if (member.user.bot || member.roles.cache.some((r) => ourRoleIds.includes(r.id))) continue;
-    await member.roles.add(roles.membre).catch(() => null);
-    count++;
-  }
-  if (count) log(`Rôle Membre donné à ${count} membre(s).`);
+  // Le rôle Membre n'est plus donné ici : il s'obtient en acceptant le règlement.
 }
 
 async function setupGuild(guild, log = console.log) {
@@ -169,8 +161,8 @@ async function setupGuild(guild, log = console.log) {
     log(`Serveur renommé en ${env.serverName}`);
   }
 
-  // Permissions de base de @everyone (les salons lecture seule les restreignent ensuite).
-  await guild.roles.everyone.setPermissions(ROLES.find((r) => r.key === 'membre').permissions);
+  // @everyone ne voit que l'Accueil tant que le règlement n'est pas accepté.
+  await guild.roles.everyone.setPermissions(EVERYONE_PERMS);
 
   const roles = await setupRoles(guild, log);
   const channels = await setupChannels(guild, roles, log);
@@ -186,10 +178,9 @@ async function setupGuild(guild, log = console.log) {
     });
   }
 
-  if (channels.tickets) {
-    // Chargé ici pour éviter une dépendance circulaire (tickets.js utilise setup.js).
-    await require('./tickets').postPanel(channels.tickets, log);
-  }
+  // Chargés ici pour éviter une dépendance circulaire (ces modules utilisent setup.js).
+  if (channels.tickets) await require('./tickets').postPanel(channels.tickets, log);
+  if (channels['règlement']) await require('./rules').postRules(channels['règlement'], log);
 
   await assignRoles(guild, roles, log);
   log('✅ Configuration terminée.');

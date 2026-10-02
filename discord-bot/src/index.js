@@ -1,8 +1,14 @@
-const { Client, Events, GatewayIntentBits, EmbedBuilder, ChannelType, MessageFlags } = require('discord.js');
-const { env, PSEUDO } = require('./config');
-const { setupGuild, findRole, findChannel } = require('./setup');
+const { Client, Events, GatewayIntentBits, MessageFlags } = require('discord.js');
+const { env } = require('./config');
+const { setupGuild, findRole } = require('./setup');
 const { commands } = require('./commands');
-const { handleTicketInteraction } = require('./tickets');
+const { sendWelcome } = require('./welcome');
+const { startGiveawayTimer } = require('./giveaways');
+
+// Modules qui gèrent des boutons, menus et formulaires.
+const componentHandlers = ['./tickets', './rules', './welcome', './announce', './giveaways'].map(
+  (file) => require(file).handleComponent,
+);
 
 if (!env.token || !env.guildId) {
   console.error('❌ Remplis DISCORD_TOKEN et GUILD_ID dans le fichier .env');
@@ -15,6 +21,7 @@ const client = new Client({
 
 client.once(Events.ClientReady, async (c) => {
   console.log(`✅ Connecté en tant que ${c.user.tag}`);
+  startGiveawayTimer(c);
   if (!env.autoSetup) return;
 
   const guild = await c.guilds.fetch(env.guildId).catch(() => null);
@@ -37,35 +44,22 @@ client.once(Events.ClientReady, async (c) => {
   }
 });
 
-// Nouveau membre : rôle Membre + message de bienvenue.
+// Nouveau membre : message de bienvenue. Le rôle Membre s'obtient en acceptant le règlement.
 client.on(Events.GuildMemberAdd, async (member) => {
   if (member.user.bot || member.guild.id !== env.guildId) return;
-
-  const role = findRole(member.guild, 'membre');
-  if (role) await member.roles.add(role).catch((err) => console.error('Rôle Membre :', err.message));
-
-  const welcome = findChannel(member.guild, [ChannelType.GuildText], 'bienvenue');
-  const rules = findChannel(member.guild, [ChannelType.GuildText], 'règlement');
-  if (!welcome) return;
-
-  const embed = new EmbedBuilder()
-    .setColor(0xff6ec7)
-    .setTitle(`Bienvenue dans l’univers de ${PSEUDO} ♡`)
-    .setDescription(
-      `Coucou ${member} 💫\n\n` +
-        (rules ? `Pense à lire le ${rules} avant tout.\n` : '') +
-        `Tu es le membre n°**${member.guild.memberCount}**.`,
-    )
-    .setThumbnail(member.user.displayAvatarURL());
-  await welcome.send({ content: `${member}`, embeds: [embed] }).catch(() => null);
+  await sendWelcome(member);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
-    if (await handleTicketInteraction(interaction)) return;
-    if (!interaction.isChatInputCommand()) return;
-    const command = commands.find((c) => c.data.name === interaction.commandName);
-    if (command) await command.execute(interaction);
+    if (interaction.isChatInputCommand()) {
+      const command = commands.find((c) => c.data.name === interaction.commandName);
+      if (command) await command.execute(interaction);
+      return;
+    }
+    for (const handle of componentHandlers) {
+      if (await handle(interaction)) return;
+    }
   } catch (err) {
     console.error('Erreur interaction :', err);
     const reply = { content: `❌ ${err.message}`, flags: MessageFlags.Ephemeral };

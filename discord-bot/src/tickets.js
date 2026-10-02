@@ -11,17 +11,25 @@ const {
   MediaGalleryBuilder,
   MediaGalleryItemBuilder,
   MessageFlags,
+  ModalBuilder,
   PermissionFlagsBits: P,
   SeparatorBuilder,
+  SlashCommandBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
   TextDisplayBuilder,
+  TextInputBuilder,
+  TextInputStyle,
 } = require('discord.js');
 const { TICKET_TYPES, TICKET_PANEL, STAFF_ROLES } = require('./config');
 const { findChannel, findRole } = require('./setup');
+const { upsertPanel } = require('./panels');
 
 const OPEN_ID = 'ticket:open';
 const CLOSE_ID = 'ticket:close';
+const CLAIM_ID = 'ticket:claim';
+const RENAME_ID = 'ticket:rename';
+const RENAME_MODAL_ID = 'ticket:rename-modal';
 const ASSETS_DIR = path.join(__dirname, '..', 'assets');
 
 // Bannière locale (assets/ticket.png, .jpg, .gif ou .webp) en priorité, sinon TICKET_IMAGE_URL.
@@ -75,19 +83,8 @@ function buildPanel() {
 }
 
 // Poste le panneau dans #tickets, ou met à jour celui qui y est déjà.
-async function postPanel(channel, log = console.log) {
-  const messages = await channel.messages.fetch({ limit: 50 });
-  const existing = messages.find(
-    (m) => m.author.id === channel.client.user.id && JSON.stringify(m.components).includes(OPEN_ID),
-  );
-  const panel = buildPanel();
-  if (existing) {
-    await existing.edit({ ...panel, attachments: [] });
-    log('Panneau des tickets mis à jour.');
-  } else {
-    await channel.send(panel);
-    log('Panneau des tickets posté.');
-  }
+async function postPanel(channel, log) {
+  await upsertPanel(channel, OPEN_ID, buildPanel(), 'Panneau des tickets', log);
 }
 
 // Quelqu'un a choisi "Paiement" ou "Question" dans le menu.
@@ -133,32 +130,102 @@ async function openTicket(interaction) {
         'Explique ta demande ici avec un maximum de détails, on te répond le plus vite possible.\n' +
         'Quand c’est réglé, clique sur **Fermer le ticket**.',
     );
-  const closeRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(CLOSE_ID).setLabel('Fermer le ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger),
-  );
   await channel.send({
     content: [user, ...staff].join(' '),
     embeds: [embed],
-    components: [closeRow],
+    components: [ticketButtons()],
     allowedMentions: { users: [user.id], roles: staff.map((r) => r.id) },
   });
 
   await interaction.editReply(`Ton ticket est ouvert : ${channel}`);
 }
 
+// Boutons sous le message d'ouverture du ticket.
+function ticketButtons(claimedBy) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(CLAIM_ID)
+      .setEmoji('🙋')
+      .setLabel(claimedBy ? `Pris en charge par ${claimedBy}`.slice(0, 80) : 'Prendre en charge')
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(Boolean(claimedBy)),
+    new ButtonBuilder().setCustomId(RENAME_ID).setEmoji('✏️').setLabel('Renommer').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(CLOSE_ID).setEmoji('🔒').setLabel('Fermer le ticket').setStyle(ButtonStyle.Danger),
+  );
+}
+
+const isTicket = (channel) => Boolean(channel?.topic?.startsWith('ticket:'));
+const isStaff = (member) => member.permissions.has(P.ManageChannels);
+const ephemeral = (interaction, content) => interaction.reply({ content, flags: MessageFlags.Ephemeral });
+
+// Bouton "Prendre en charge" : réservé au staff.
+async function claimTicket(interaction) {
+  const { member } = interaction;
+  if (!isStaff(member)) return ephemeral(interaction, 'Seul le staff peut prendre en charge un ticket.');
+  await interaction.update({ components: [ticketButtons(member.displayName)] });
+  await interaction.channel.send(`🙋 ${member} prend en charge ce ticket.`);
+}
+
+// Renomme un ticket en gardant l'emoji de son type (💳 / ❓) devant.
+async function renameTicket(interaction, newName) {
+  const { channel } = interaction;
+  const type = TICKET_TYPES.find((t) => t.value === channel.topic.split(':')[1]);
+  const name = `${type ? `${type.emoji}-` : ''}${newName}`.slice(0, 100);
+
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  // Discord limite les renommages à 2 toutes les 10 minutes par salon : on n'attend pas plus de 5 s.
+  const done = await Promise.race([
+    channel.setName(name).then(() => true),
+    new Promise((resolve) => setTimeout(() => resolve(false), 5000)),
+  ]);
+  await interaction.editReply(
+    done
+      ? `Ticket renommé en **${channel.name}** ✅`
+      : 'Discord limite à 2 renommages toutes les 10 minutes : le nouveau nom sera appliqué dès que possible.',
+  );
+}
+
+function renameModal(channel) {
+  const input = new TextInputBuilder()
+    .setCustomId('name')
+    .setLabel('Nouveau nom')
+    .setStyle(TextInputStyle.Short)
+    .setMaxLength(90);
+  const current = channel.name.replace(/^\p{Extended_Pictographic}\uFE0F?-/u, '');
+  if (current) input.setValue(current.slice(0, 90));
+  return new ModalBuilder()
+    .setCustomId(RENAME_MODAL_ID)
+    .setTitle('Renommer le ticket')
+    .addComponents(new ActionRowBuilder().addComponents(input));
+}
+
 // Bouton "Fermer le ticket" : la personne du ticket ou le staff peuvent fermer.
 async function closeTicket(interaction) {
   const { channel, member } = interaction;
   const ownerId = channel.topic?.split(':')[2];
-  const allowed = member.id === ownerId || member.permissions.has(P.ManageChannels);
-  if (!allowed) {
-    return interaction.reply({ content: 'Tu ne peux pas fermer ce ticket.', flags: MessageFlags.Ephemeral });
-  }
+  if (member.id !== ownerId && !isStaff(member)) return ephemeral(interaction, 'Tu ne peux pas fermer ce ticket.');
   await interaction.reply(`🔒 Ticket fermé par ${member}. Le salon sera supprimé dans 5 secondes.`);
   setTimeout(() => channel.delete('Ticket fermé').catch(() => null), 5000);
 }
 
-async function handleTicketInteraction(interaction) {
+const command = {
+  data: new SlashCommandBuilder()
+    .setName('ticket')
+    .setDescription('Gérer le ticket actuel')
+    .setDefaultMemberPermissions(P.ManageChannels)
+    .addSubcommand((s) =>
+      s
+        .setName('renommer')
+        .setDescription('Renommer ce ticket')
+        .addStringOption((o) => o.setName('nom').setDescription('Le nouveau nom').setRequired(true).setMaxLength(90)),
+    ),
+  async execute(interaction) {
+    if (!isTicket(interaction.channel)) return ephemeral(interaction, 'Cette commande marche seulement dans un ticket.');
+    await renameTicket(interaction, interaction.options.getString('nom'));
+  },
+};
+
+async function handleComponent(interaction) {
   if (interaction.isStringSelectMenu() && interaction.customId === OPEN_ID) {
     await openTicket(interaction);
     return true;
@@ -167,7 +234,20 @@ async function handleTicketInteraction(interaction) {
     await closeTicket(interaction);
     return true;
   }
+  if (interaction.isButton() && interaction.customId === CLAIM_ID) {
+    await claimTicket(interaction);
+    return true;
+  }
+  if (interaction.isButton() && interaction.customId === RENAME_ID) {
+    if (!isStaff(interaction.member)) await ephemeral(interaction, 'Seul le staff peut renommer un ticket.');
+    else await interaction.showModal(renameModal(interaction.channel));
+    return true;
+  }
+  if (interaction.isModalSubmit() && interaction.customId === RENAME_MODAL_ID) {
+    await renameTicket(interaction, interaction.fields.getTextInputValue('name'));
+    return true;
+  }
   return false;
 }
 
-module.exports = { postPanel, buildPanel, handleTicketInteraction };
+module.exports = { postPanel, buildPanel, handleComponent, commands: [command] };

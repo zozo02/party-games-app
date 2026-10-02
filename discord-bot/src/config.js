@@ -24,7 +24,7 @@ const env = {
 // Permissions
 // ---------------------------------------------------------------------------
 
-// Ce que tout le monde (@everyone et Membre) peut faire sur le serveur.
+// Ce que les membres (rôle Membre, donné en acceptant le règlement) peuvent faire.
 const MEMBER_PERMS = [
   P.ViewChannel,
   P.ReadMessageHistory,
@@ -37,6 +37,10 @@ const MEMBER_PERMS = [
   P.Speak,
   P.UseVAD,
 ];
+
+// @everyone (pas encore accepté le règlement) : pareil, mais sans voir les salons.
+// Seule la catégorie Accueil leur est ouverte, pour lire et accepter le règlement.
+const EVERYONE_PERMS = MEMBER_PERMS.filter((perm) => perm !== P.ViewChannel);
 
 // Clients : un peu plus que les membres.
 const CLIENT_PERMS = [
@@ -97,6 +101,7 @@ const CATEGORIES = [
   {
     name: '☾ • Accueil',
     readOnly: true,
+    public: true,
     channels: [
       channel('💫', 'bienvenue', { topic: 'Bienvenue dans l’univers ♡' }),
       channel('🌕', 'annonces', { topic: 'Les annonces importantes du serveur.' }),
@@ -180,6 +185,7 @@ module.exports = {
   ROLES,
   CATEGORIES,
   READ_ONLY_DENY,
+  EVERYONE_PERMS,
   STAFF_ROLES,
   TICKET_TYPES,
   TICKET_PANEL,

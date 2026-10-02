@@ -38,6 +38,10 @@ const commands = [
   },
   giveRoleCommand('client', 'clients', 'Donne le rôle Client à un membre'),
   giveRoleCommand('friend', 'friends', 'Donne le rôle Friends à un membre'),
+  ...require('./welcome').commands,
+  ...require('./announce').commands,
+  ...require('./giveaways').commands,
+  ...require('./tickets').commands,
 ];
 
 module.exports = { commands };

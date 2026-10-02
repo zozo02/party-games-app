@@ -1,0 +1,2 @@
+Mets ici la bannière du salon #tickets, nommée ticket.png (ou .jpg, .gif, .webp).
+Elle sera affichée en haut du panneau "Espace Ticket".

@@ -46,8 +46,10 @@ Le token reste dans le fichier `.env` : ne le partage pas. Le fichier est déjà
 |---|---|---|
 | ☾ • Accueil | bienvenue, annonces, règlement, boosts, giveaways | Personne (seulement les admins) |
 | ✶ ·.˚ LITTLE UNIVERSE | previews 🔞, pack-speciaux (forum 🔞), tarifs, moyens-de-paiement, wishlist, avis | Personne, sauf **pack-speciaux** où tout le monde peut publier |
-| ✧ • SUPPORT | tickets | Personne pour l'instant (pas encore de système de tickets) |
+| ✧ • SUPPORT | tickets | Personne : on ouvre un ticket avec le menu |
 | .✦. • Communauté | discussion, medias, vos-selfies, idees | Tout le monde |
+| 💳 • Tickets Paiement | (les tickets « Paiement ») | Invisible sauf pour Fondateur, littledesire ♡ et Manager |
+| ❓ • Tickets Questions | (les tickets « Question ») | Invisible sauf pour Fondateur, littledesire ♡ et Manager |
 
 `previews` et `pack-speciaux` sont marqués **18+** : Discord demande aux gens de confirmer qu'ils sont majeurs avant d'y entrer.
 
@@ -56,6 +58,38 @@ Le token reste dans le fichier `.env` : ne le partage pas. Le fichier est déjà
 - les IDs mis dans `FONDATEUR_IDS`, `CREATRICE_IDS` et `MANAGER_IDS` dans le `.env` reçoivent leur rôle ;
 - chaque nouveau membre reçoit **Membre** et un message de bienvenue dans #bienvenue ;
 - les membres déjà présents qui n'ont aucun rôle reçoivent **Membre**.
+
+## Tickets
+
+Dans `#tickets`, le bot poste un panneau « Espace Ticket » : une bannière, le texte, l'avertissement et le menu **Fais un choix**.
+
+- **Paiement** crée un salon `💳-paiement-pseudo` dans la catégorie **Tickets Paiement**.
+- **Question** crée un salon `❓-question-pseudo` dans la catégorie **Tickets Questions**.
+- Seuls la personne qui a ouvert le ticket et le staff (Fondateur, littledesire ♡, Manager) voient le salon. Le staff est mentionné à l'ouverture.
+- On ne peut avoir qu'un seul ticket ouvert de chaque type.
+- Le bouton **Fermer le ticket** supprime le salon. La personne du ticket ou le staff peuvent l'utiliser.
+
+**Bannière** : mets ton image dans `assets/ticket.png` (ou `.jpg`, `.gif`, `.webp`), ou mets un lien dans `TICKET_IMAGE_URL` dans le `.env`. Sans image, le panneau affiche le titre « Espace Ticket » à la place.
+Après un changement d'image ou de texte (les textes sont dans `TICKET_PANEL`, dans `src/config.js`), redémarre le bot ou tape `/setup` : le panneau est mis à jour, sans en poster un deuxième.
+
+## Héberger le bot sur un VPS
+
+Le bot prend environ 80 à 120 Mo de RAM. Il peut tourner sur le même VPS que d'autres bots, avec son propre token.
+
+```bash
+# envoie le dossier discord-bot sur le VPS (sans node_modules), puis :
+cd discord-bot
+npm install
+npm run deploy
+npm install -g pm2          # si pm2 n'est pas déjà installé
+pm2 start src/index.js --name littledesire-bot
+pm2 save                    # pour qu'il redémarre avec le VPS
+```
+
+Ensuite :
+- `pm2 restart littledesire-bot` pour le redémarrer après une modification ;
+- `pm2 logs littledesire-bot` pour voir ce qu'il affiche ;
+- `pm2 monit` pour voir la RAM utilisée.
 
 ## Commandes slash
 

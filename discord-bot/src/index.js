@@ -2,6 +2,7 @@ const { Client, Events, GatewayIntentBits, EmbedBuilder, ChannelType, MessageFla
 const { env, PSEUDO } = require('./config');
 const { setupGuild, findRole, findChannel } = require('./setup');
 const { commands } = require('./commands');
+const { handleTicketInteraction } = require('./tickets');
 
 if (!env.token || !env.guildId) {
   console.error('❌ Remplis DISCORD_TOKEN et GUILD_ID dans le fichier .env');
@@ -52,14 +53,13 @@ client.on(Events.GuildMemberAdd, async (member) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
-  const command = commands.find((c) => c.data.name === interaction.commandName);
-  if (!command) return;
-
   try {
-    await command.execute(interaction);
+    if (await handleTicketInteraction(interaction)) return;
+    if (!interaction.isChatInputCommand()) return;
+    const command = commands.find((c) => c.data.name === interaction.commandName);
+    if (command) await command.execute(interaction);
   } catch (err) {
-    console.error(`Erreur /${interaction.commandName} :`, err);
+    console.error('Erreur interaction :', err);
     const reply = { content: `❌ ${err.message}`, flags: MessageFlags.Ephemeral };
     if (interaction.deferred || interaction.replied) await interaction.followUp(reply).catch(() => null);
     else await interaction.reply(reply).catch(() => null);

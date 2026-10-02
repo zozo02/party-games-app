@@ -125,7 +125,7 @@ const CATEGORIES = [
   {
     name: '✧ • SUPPORT',
     readOnly: true,
-    channels: [channel('🪐', 'tickets', { topic: 'Le système de tickets arrive bientôt.' })],
+    channels: [channel('🪐', 'tickets', { topic: 'Ouvre un ticket avec le menu ci-dessous.' })],
   },
   {
     name: '.✦. • Communauté',
@@ -137,6 +137,50 @@ const CATEGORIES = [
       channel('💭', 'idees', { topic: 'Vos idées pour améliorer le serveur.' }),
     ],
   },
+  // Catégories où arrivent les tickets : visibles seulement par le staff
+  // (et par la personne qui a ouvert le ticket, dans son propre salon).
+  { name: '💳 • Tickets Paiement', staffOnly: true, channels: [] },
+  { name: '❓ • Tickets Questions', staffOnly: true, channels: [] },
 ];
 
-module.exports = { env, PSEUDO, ROLES, CATEGORIES, READ_ONLY_DENY };
+// Rôles qui voient tous les tickets.
+const STAFF_ROLES = ['fondateur', 'creatrice', 'manager'];
+
+// Choix du menu déroulant "Fais un choix".
+const TICKET_TYPES = [
+  {
+    value: 'paiement',
+    label: 'Paiement',
+    emoji: '💳',
+    description: 'Une question sur un paiement ou une commande',
+    category: '💳 • Tickets Paiement',
+  },
+  {
+    value: 'question',
+    label: 'Question',
+    emoji: '❓',
+    description: 'Une question ou une demande d’information',
+    category: '❓ • Tickets Questions',
+  },
+];
+
+const TICKET_PANEL = {
+  title: 'Espace Ticket',
+  text: 'N’hésitez pas à faire un ticket pour toute demande ou toute commande, nous vous répondrons le plus rapidement possible.',
+  warning: '⚠️ Merci de rester gentil et courtois dans mes tickets.',
+  color: 0x9d4edd,
+  // Bannière : mets une image "ticket.png" (ou .jpg/.gif/.webp) dans le dossier assets/,
+  // ou bien un lien dans TICKET_IMAGE_URL du .env.
+  imageUrl: (process.env.TICKET_IMAGE_URL || '').trim(),
+};
+
+module.exports = {
+  env,
+  PSEUDO,
+  ROLES,
+  CATEGORIES,
+  READ_ONLY_DENY,
+  STAFF_ROLES,
+  TICKET_TYPES,
+  TICKET_PANEL,
+};

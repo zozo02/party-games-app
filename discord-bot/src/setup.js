@@ -1,5 +1,5 @@
 const { ChannelType, GuildSystemChannelFlags, PermissionFlagsBits: P } = require('discord.js');
-const { env, ROLES, CATEGORIES, READ_ONLY_DENY } = require('./config');
+const { env, ROLES, CATEGORIES, READ_ONLY_DENY, STAFF_ROLES } = require('./config');
 
 // "💫 • Bienvenue •" -> "bienvenue" : permet de retrouver un salon même si
 // Discord a modifié les espaces/emojis, pour ne jamais créer de doublon.
@@ -52,15 +52,22 @@ async function setupRoles(guild, log) {
   return roles;
 }
 
-async function setupChannels(guild, log) {
+async function setupChannels(guild, roles, log) {
   const everyone = guild.roles.everyone.id;
   const readOnly = [{ id: everyone, deny: READ_ONLY_DENY }];
+  const staffOnly = [
+    { id: everyone, deny: [P.ViewChannel] },
+    ...STAFF_ROLES.map((key) => ({
+      id: roles[key].id,
+      allow: [P.ViewChannel, P.SendMessages, P.ReadMessageHistory, P.AttachFiles, P.EmbedLinks],
+    })),
+  ];
   const positions = [];
   const created = {};
 
   for (const [catIndex, cat] of CATEGORIES.entries()) {
     let category = findChannel(guild, [ChannelType.GuildCategory], cat.name);
-    const overwrites = cat.readOnly ? readOnly : [];
+    const overwrites = cat.staffOnly ? staffOnly : cat.readOnly ? readOnly : [];
     if (category) {
       await category.permissionOverwrites.set(overwrites);
       log(`Catégorie mise à jour : ${cat.name}`);
@@ -166,7 +173,7 @@ async function setupGuild(guild, log = console.log) {
   await guild.roles.everyone.setPermissions(ROLES.find((r) => r.key === 'membre').permissions);
 
   const roles = await setupRoles(guild, log);
-  const channels = await setupChannels(guild, log);
+  const channels = await setupChannels(guild, roles, log);
 
   // Les messages de boost arrivent dans #boosts, l'accueil est géré par le bot dans #bienvenue.
   if (channels.boosts) {
@@ -177,6 +184,11 @@ async function setupGuild(guild, log = console.log) {
         GuildSystemChannelFlags.SuppressJoinNotificationReplies |
         GuildSystemChannelFlags.SuppressGuildReminderNotifications,
     });
+  }
+
+  if (channels.tickets) {
+    // Chargé ici pour éviter une dépendance circulaire (tickets.js utilise setup.js).
+    await require('./tickets').postPanel(channels.tickets, log);
   }
 
   await assignRoles(guild, roles, log);

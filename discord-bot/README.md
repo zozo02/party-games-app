@@ -1,7 +1,7 @@
 # Bot Discord littledesire
 
-Quand le bot démarre, il configure le serveur tout seul : rôles, catégories, salons, permissions, et il donne les rôles aux membres.
-On peut le relancer autant de fois qu'on veut : il met à jour ce qui existe déjà et ne crée pas de doublons.
+Au **premier** démarrage, le bot configure le serveur tout seul : rôles, catégories, salons, permissions, et il donne les rôles aux membres.
+Aux démarrages suivants, il ne touche à rien. Pour mettre le serveur à jour, tape `/setup` : il modifie ce qui existe déjà et ne crée jamais de doublons.
 
 ## 1. Créer le bot (une seule fois)
 
@@ -70,7 +70,7 @@ Dans `#tickets`, le bot poste un panneau « Espace Ticket » : une bannière, le
 - Le bouton **Fermer le ticket** supprime le salon. La personne du ticket ou le staff peuvent l'utiliser.
 
 **Bannière** : mets ton image dans `assets/ticket.png` (ou `.jpg`, `.gif`, `.webp`), ou mets un lien dans `TICKET_IMAGE_URL` dans le `.env`. Sans image, le panneau affiche le titre « Espace Ticket » à la place.
-Après un changement d'image ou de texte (les textes sont dans `TICKET_PANEL`, dans `src/config.js`), redémarre le bot ou tape `/setup` : le panneau est mis à jour, sans en poster un deuxième.
+Après un changement d'image ou de texte (les textes sont dans `TICKET_PANEL`, dans `src/config.js`), tape `/setup` : le panneau est mis à jour, sans en poster un deuxième.
 
 ## Héberger le bot sur un VPS
 
@@ -104,7 +104,7 @@ Ensuite :
 - Pseudo, nom du serveur : dans le `.env` (`PSEUDO`, `SERVER_NAME`).
 - Noms, emojis, couleurs et droits des rôles et salons : dans `src/config.js`.
 
-Après une modification, relance `npm start`, ou tape `/setup` sur Discord.
+Après une modification, redémarre le bot pour charger le nouveau code, puis tape `/setup` sur Discord pour l'appliquer au serveur.
 
 ## Problèmes fréquents
 

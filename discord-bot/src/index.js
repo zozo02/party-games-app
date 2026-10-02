@@ -22,6 +22,14 @@ client.once(Events.ClientReady, async (c) => {
     console.error('❌ Le bot n’est pas sur le serveur GUILD_ID. Invite-le d’abord (voir README).');
     return;
   }
+
+  // Configuration automatique uniquement au tout premier démarrage : si les rôles
+  // existent déjà, on ne touche à rien (pour mettre à jour : /setup).
+  await guild.roles.fetch();
+  if (findRole(guild, 'fondateur')) {
+    console.log('ℹ️ Serveur déjà configuré, rien n’est modifié. Tape /setup pour le mettre à jour.');
+    return;
+  }
   try {
     await setupGuild(guild);
   } catch (err) {

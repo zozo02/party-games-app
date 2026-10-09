@@ -17,9 +17,14 @@ const { upsertPanel } = require('./panels');
 const ACCEPT_ID = 'rules:accept';
 const RULES_FILE = path.join(__dirname, '..', 'textes', 'reglement.md');
 
-// Rôle donné en acceptant le règlement : MEMBER_ROLE_ID, sinon le rôle qui s'appelle "Membre".
-const getMemberRole = (guild) =>
-  (env.memberRoleId && guild.roles.cache.get(env.memberRoleId)) || findRoleByName(guild, 'Membre');
+// Rôles donnés en acceptant le règlement : MEMBER_ROLE_IDS (un ou plusieurs),
+// sinon le rôle qui s'appelle "Membre".
+function getMemberRoles(guild) {
+  const byId = env.memberRoleIds.map((id) => guild.roles.cache.get(id)).filter(Boolean);
+  if (byId.length) return byId;
+  const byName = findRoleByName(guild, 'Membre');
+  return byName ? [byName] : [];
+}
 
 // "#tickets" dans le texte devient une vraie mention cliquable du salon.
 const linkChannels = (guild, text) =>
@@ -46,24 +51,32 @@ function buildRules(guild) {
 }
 
 async function postRules(channel, log = console.log) {
-  if (!getMemberRole(channel.guild)) {
-    log('⚠️ Aucun rôle Membre trouvé : mets son ID dans MEMBER_ROLE_ID (.env) ou crée un rôle "Membre".');
+  const { guild } = channel;
+  const found = getMemberRoles(guild);
+  if (!found.length) {
+    log('⚠️ Aucun rôle Membre trouvé : mets son ID dans MEMBER_ROLE_IDS (.env) ou crée un rôle "Membre".');
+  } else {
+    log(`Rôles donnés avec le bouton : ${found.map((r) => r.name).join(', ')}`);
+  }
+  for (const id of env.memberRoleIds.filter((id) => !guild.roles.cache.has(id))) {
+    log(`⚠️ Rôle introuvable sur ce serveur (ID ${id}) : vérifie MEMBER_ROLE_IDS dans le .env.`);
   }
   await upsertPanel(channel, ACCEPT_ID, buildRules(channel.guild), 'Règlement', log);
 }
 
-// Clic sur "J'accepte le règlement" : on donne le rôle Membre.
+// Clic sur "J'accepte le règlement" : on donne tous les rôles Membre qui manquent.
 async function handleComponent(interaction) {
   if (!interaction.isButton() || interaction.customId !== ACCEPT_ID) return false;
 
-  const role = getMemberRole(interaction.guild);
-  if (!role) {
+  const roles = getMemberRoles(interaction.guild);
+  const missing = roles.filter((role) => !interaction.member.roles.cache.has(role.id));
+  if (!roles.length) {
     await ephemeral(interaction, 'Rôle Membre introuvable, préviens un admin.');
-  } else if (interaction.member.roles.cache.has(role.id)) {
+  } else if (!missing.length) {
     await ephemeral(interaction, 'Tu as déjà accepté le règlement ♡');
   } else {
     try {
-      await interaction.member.roles.add(role, 'Règlement accepté');
+      await interaction.member.roles.add(missing, 'Règlement accepté');
       await ephemeral(interaction, 'Merci ! Tu as maintenant accès au serveur ✨');
     } catch (err) {
       await ephemeral(interaction, `Je n’ai pas pu te donner le rôle : ${explainError(err)}`);

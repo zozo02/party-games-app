@@ -38,7 +38,7 @@ Si tu as déjà le dépôt (pour le bot littledesire), fais seulement `git pull`
 | `DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID` | Les infos du bot et du serveur |
 | `PSEUDO`, `SERVER_NAME` | `Kirby` et `Kirby World` (déjà remplis) |
 | `STAFF_ROLE_IDS` | Les IDs des rôles qui voient les tickets (Fondateur, Kirby, Manager), séparés par des virgules. Clic droit sur un rôle > **Copier l'identifiant du rôle** |
-| `MEMBER_ROLE_ID` | Le rôle donné en acceptant le règlement. Vide = le rôle qui s'appelle « Membre » |
+| `MEMBER_ROLE_IDS` | Le ou les rôles donnés en acceptant le règlement. Plusieurs rôles = sur **la même ligne**, séparés par une virgule : `MEMBER_ROLE_IDS=111...,222...`. Vide = le rôle qui s'appelle « Membre » |
 | `HOMME_ROLE_ID`, `FEMME_ROLE_ID` | Vide = le bot cherche un rôle « Homme » / « Femme » (même avec des décorations dans le nom) et les crée s'ils n'existent pas |
 | `CATEGORIE_PRESTATION_ID`, `CATEGORIE_QUESTION_ID`, `CATEGORIE_REPORT_ID` | Vide = `/installer tickets` crée les catégories. Tu peux aussi mettre l'ID de catégories qui existent déjà |
 

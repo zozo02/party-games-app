@@ -1,3 +1,5 @@
+const fs = require('node:fs');
+const path = require('node:path');
 require('dotenv').config({ quiet: true });
 
 const list = (value) =>
@@ -8,6 +10,24 @@ const list = (value) =>
 
 const text = (value, fallback = '') => (value || '').trim() || fallback;
 
+// Toutes les valeurs d'une variable du .env : séparées par des virgules sur une ligne, ou sur
+// plusieurs lignes (un .env normal ne garde que la dernière ligne d'un même nom).
+function listFromEnv(...names) {
+  const values = names.map((name) => process.env[name]);
+  try {
+    const file = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8');
+    for (const line of file.split(/\r?\n/)) {
+      const match = line.match(/^\s*([A-Z_]+)\s*=\s*(.*)$/);
+      if (match && names.includes(match[1])) {
+        values.push(match[2].replace(/\s+#.*$/, '').replace(/^["']|["']$/g, ''));
+      }
+    }
+  } catch {
+    // pas de fichier .env (variables définies autrement, par exemple sur le VPS)
+  }
+  return [...new Set(values.flatMap(list))];
+}
+
 const env = {
   token: process.env.DISCORD_TOKEN,
   clientId: process.env.CLIENT_ID,
@@ -15,7 +35,7 @@ const env = {
   pseudo: text(process.env.PSEUDO, 'Kirby'),
   serverName: text(process.env.SERVER_NAME, 'Kirby World'),
   staffRoleIds: list(process.env.STAFF_ROLE_IDS),
-  memberRoleId: text(process.env.MEMBER_ROLE_ID),
+  memberRoleIds: listFromEnv('MEMBER_ROLE_IDS', 'MEMBER_ROLE_ID'),
   hommeRoleId: text(process.env.HOMME_ROLE_ID),
   femmeRoleId: text(process.env.FEMME_ROLE_ID),
   ticketThumbnailUrl: text(process.env.TICKET_MINIATURE_URL),

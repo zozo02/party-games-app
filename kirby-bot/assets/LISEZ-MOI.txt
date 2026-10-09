@@ -1,0 +1,16 @@
+Images du panneau "Espace Tickets" (affichées dans le salon #tickets).
+
+Mets tes photos ici, avec ces noms (png, jpg, jpeg, gif ou webp) :
+
+  miniature.png   la petite image en haut à droite du panneau
+  ticket-1.png    la grande image en dessous
+  ticket-2.png    (optionnel) une 2e grande image
+  ticket-3.png    (optionnel) une 3e
+  ticket-4.png    (optionnel) une 4e
+
+Plusieurs grandes images s'affichent côte à côte, en grille.
+Après avoir changé les images : redémarre le bot puis tape /installer tickets
+dans le salon des tickets, le panneau est mis à jour (pas de doublon).
+
+Tu peux aussi mettre des liens dans le .env (TICKET_MINIATURE_URL, TICKET_IMAGE_URL).
+Les images du dossier assets/ sont utilisées en priorité.
